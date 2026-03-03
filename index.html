@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光學干涉與繞射完整比較 (教學版)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden; /* 防止水平捲動 */
+        }
+        h2 { margin-bottom: 5px; color: #fff; text-align: center; }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            max-width: 1200px;
+            width: 100%;
+            justify-content: center;
+        }
+        
+        /* 控制面板樣式 */
+        .controls {
+            flex: 0 0 280px; 
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            height: fit-content;
+        }
+        .control-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 0.85em; color: #aaa; }
+        input[type="range"] { width: 100%; accent-color: #4CAF50; cursor: pointer; margin: 0; }
+        .value-display { float: right; color: #4CAF50; font-family: monospace; font-weight: bold; }
+        
+        /* 螢幕顯示區樣式 */
+        .screen-container {
+            flex: 1; 
+            min-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .display-box {
+            background: #1e1e1e;
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .display-label {
+            display: block;
+            text-align: center;
+            font-size: 1.0em;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+            padding-bottom: 3px;
+            border-bottom: 2px solid #333;
+        }
+        canvas {
+            background-color: #000;
+            border-radius: 8px;
+            width: 100%; 
+            height: auto; 
+            cursor: crosshair;
+            touch-action: none; 
+        }
+        .note {
+            font-size: 0.78em;
+            color: #888;
+            margin-top: 5px;
+            line-height: 1.4;
+            border-top: 1px solid #333;
+            padding-top: 8px;
+        }
+        .highlight { color: #4CAF50; }
+        .guide-text { color: #FFEB3B; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>單、雙狹縫干涉與繞射完整比較</h2>
+
+    <div class="container">
+        <div class="controls">
+            <h3 style="margin: 0 0 10px 0; color:#fff; font-size: 1.1em;">參數控制</h3>
+            
+            <div class="control-group">
+                <label for="wavelength">
+                    入射光波長 (λ) 
+                    <span id="wavelengthVal" class="value-display">532 nm</span>
+                </label>
+                <input type="range" id="wavelength" min="380" max="750" value="532">
+            </div>
+
+            <div class="control-group">
+                <label for="zoom">
+                    畫面縮放 (Zoom)
+                    <span id="zoomVal" class="value-display">1.0 x</span>
+                </label>
+                <input type="range" id="zoom" min="0.2" max="5" step="0.1" value="1.0">
+            </div>
+
+            <div class="control-group">
+                <label for="screenDist">
+                    狹縫到螢幕距離 (L)
+                    <span id="screenDistVal" class="value-display">1.0 m</span>
+                </label>
+                <input type="range" id="screenDist" min="0.1" max="5.0" step="0.1" value="1.0">
+            </div>
+
+            <div class="control-group">
+                <label for="slitSeparation">
+                    狹縫間距 (d, 僅雙狹縫)
+                    <span id="slitSeparationVal" class="value-display">10.0 μm</span>
+                </label>
+                <input type="range" id="slitSeparation" min="3" max="40" step="0.5" value="10.0">
+            </div>
+
+            <div class="control-group">
+                <label for="slitWidth">
+                    狹縫寬度 (a, 單與真實雙)
+                    <span id="slitWidthVal" class="value-display">2.0 μm</span>
+                </label>
+                <input type="range" id="slitWidth" min="0.5" max="10" step="0.1" value="2.0">
+            </div>
+
+            <div class="note">
+                <strong>比較說明：</strong><br>
+                1. 上方：<span class="highlight">單狹縫绕射</span> (純粹a效應)。<br>
+                2. 中間：<span class="highlight">理想雙狹縫干涉</span> (純粹d效應，忽略a)。<br>
+                3. 下方：<span class="highlight">真實雙狹縫干涉</span> (a與d效應疊加)。<br>
+                4. <span class="guide-text">互動：</span>在任一圖上拖曳，可移動黃色虛線對齊比較。
+            </div>
+        </div>
+
+        <div class="screen-container">
+            <div class="display-box">
+                <label class="display-label">SINGLE：單狹縫繞射 (純粹的繞射包絡)</label>
+                <canvas id="screen_single" width="800" height="240"></canvas>
+            </div>
+
+            <div class="display-box">
+                <label class="display-label">IDEAL：理想雙狹縫 (純純的干涉，假設a→0)</label>
+                <canvas id="screen_ideal" width="800" height="240"></canvas>
+            </div>
+            
+            <div class="display-box">
+                <label class="display-label">REAL：真實雙狹縫 (干涉 + 繞射包絡限制)</label>
+                <canvas id="screen_real" width="800" height="240"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化 Canvas 和 Context
+        const canvasSingle = document.getElementById('screen_single');
+        const ctxSingle = canvasSingle.getContext('2d');
+        const canvasIdeal = document.getElementById('screen_ideal');
+        const ctxIdeal = canvasIdeal.getContext('2d');
+        const canvasReal = document.getElementById('screen_real');
+        const ctxReal = canvasReal.getContext('2d');
+
+        // 統一畫布尺寸定義 (稍微壓縮高度以容納三個螢幕)
+        const width = canvasReal.width; 
+        const height = canvasReal.height;
+        const patternHeight = 80;  // 投影圖樣高度
+        const graphTop = 110;       // 曲線圖頂部
+        const graphHeight = 120;   // 曲線圖最大高度
+
+        // 對齊線的 X 座標
+        let guideLineX = width / 2;
+        let isDragging = false;
+
+        // 參數輸入和顯示
+        const inputs = {
+            zoom: document.getElementById('zoom'),
+            L: document.getElementById('screenDist'),
+            lambda: document.getElementById('wavelength'),
+            a: document.getElementById('slitWidth'),
+            d: document.getElementById('slitSeparation')
+        };
+        const displays = {
+            zoom: document.getElementById('zoomVal'),
+            L: document.getElementById('screenDistVal'),
+            lambda: document.getElementById('wavelengthVal'),
+            a: document.getElementById('slitWidthVal'),
+            d: document.getElementById('slitSeparationVal')
+        };
+
+        // 物理顏色轉換 (nm -> RGB)
+        function wavelengthToRGB(W) {
+            let R, G, B;
+            if (W >= 380 && W < 440) { R = -(W - 440) / (440 - 380); G = 0.0; B = 1.0; } 
+            else if (W >= 440 && W < 490) { R = 0.0; G = (W - 440) / (490 - 440); B = 1.0; } 
+            else if (W >= 490 && W < 510) { R = 0.0; G = 1.0; B = -(W - 510) / (510 - 490); } 
+            else if (W >= 510 && W < 580) { R = (W - 510) / (580 - 510); G = 1.0; B = 0.0; } 
+            else if (W >= 580 && W < 645) { R = 1.0; G = -(W - 645) / (645 - 580); B = 0.0; } 
+            else if (W >= 645 && W <= 780) { R = 1.0; G = 0.0; B = 0.0; } 
+            else { R = 0.0; G = 0.0; B = 0.0; }
+            let factor = (W >= 380 && W < 420) ? 0.3 + 0.7 * (W - 380) / (420 - 380) :
+                         (W >= 420 && W < 701) ? 1.0 :
+                         (W >= 701 && W <= 780) ? 0.3 + 0.7 * (780 - W) / (780 - 700) : 0.0;
+            return { r: Math.round(R * factor * 255), g: Math.round(G * factor * 255), b: Math.round(B * factor * 255) };
+        }
+
+        // 核心計算和繪製函數
+        function drawAll() {
+            // 讀取參數
+            const zoom = parseFloat(inputs.zoom.value);
+            const L = parseFloat(inputs.L.value); // m
+            const lambda = parseFloat(inputs.lambda.value); // nm
+            const a = parseFloat(inputs.a.value); // μm
+            const d = parseFloat(inputs.d.value); // μm
+
+            // 更新數值顯示
+            displays.zoom.textContent = zoom.toFixed(1) + ' x';
+            displays.L.textContent = L.toFixed(1) + ' m';
+            displays.lambda.textContent = lambda + ' nm';
+            displays.a.textContent = a.toFixed(1) + ' μm';
+            displays.d.textContent = d.toFixed(1) + ' μm';
+
+            // 準備顏色和畫布清理
+            const color = wavelengthToRGB(lambda);
+            const rgbString = `rgb(${color.r}, ${color.g}, ${color.b})`;
+            
+            ctxSingle.clearRect(0, 0, width, height);
+            ctxIdeal.clearRect(0, 0, width, height);
+            ctxReal.clearRect(0, 0, width, height);
+
+            // 定義物理座標映射
+            const screenPhysicalWidth = 0.35 / zoom; 
+
+            // 儲存強度數據
+            let singleIntensities = [];
+            let idealIntensities = [];
+            let realIntensities = [];
+
+            for (let x = 0; x < width; x++) {
+                // 像素 -> 實體位置 (m)
+                let physicalX = ((x - width / 2) / width) * screenPhysicalWidth;
+                
+                // 物理計算：三角函數
+                let tanTheta = physicalX / L;
+                let sinTheta = tanTheta / Math.sqrt(1 + tanTheta * tanTheta);
+                
+                let a_nm = a * 1000;
+                let d_nm = d * 1000;
+
+                // --- 1. 計算單狹縫繞射項 (Single slit diffraction) alpha = (π * a * sinθ) / λ ---
+                let alpha = (Math.PI * a_nm * sinTheta) / lambda;
+                let diffractionTerm = 1; // sinc(0)=1
+                if (Math.abs(alpha) > 1e-8) {
+                    diffractionTerm = Math.pow(Math.sin(alpha) / alpha, 2);
+                }
+
+                // --- 2. 計算理想雙狹縫干涉項 (Ideal interference) β = (π * d * sinθ) / λ ---
+                let beta = (Math.PI * d_nm * sinTheta) / lambda;
+                let interferenceTerm = Math.pow(Math.cos(beta), 2); 
+
+                // --- 3. 組合強度 ---
+                let singleI = diffractionTerm;                // SINGLE: 純繞射
+                let idealI = interferenceTerm;                    // IDEAL: 純干涉
+                let realI = diffractionTerm * interferenceTerm; // REAL: 干涉 * 繞射
+
+                singleIntensities.push(singleI);
+                idealIntensities.push(idealI);
+                realIntensities.push(realI);
+
+                // --- 繪製投影圖樣 ---
+                const gamma = 0.7; // Gamma 校正
+
+                // SINGLE
+                ctxSingle.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${Math.pow(singleI, gamma)})`;
+                ctxSingle.fillRect(x, 0, 1, patternHeight);
+
+                // IDEAL
+                ctxIdeal.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${Math.pow(idealI, gamma)})`;
+                ctxIdeal.fillRect(x, 0, 1, patternHeight);
+
+                // REAL
+                ctxReal.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${Math.pow(realI, gamma)})`;
+                ctxReal.fillRect(x, 0, 1, patternHeight);
+            }
+
+            // --- 繪製強度曲線 (I-θ 圖) ---
+            const graphBottom = graphTop + graphHeight;
+
+            // 分隔線繪製函數
+            const drawSeparator = (ctx) => {
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.beginPath();
+                ctx.moveTo(0, patternHeight + 5); ctx.lineTo(width, patternHeight + 5); ctx.stroke();
+            };
+            drawSeparator(ctxSingle);
+            drawSeparator(ctxIdeal);
+            drawSeparator(ctxReal);
+
+            // 公共的曲線繪製邏輯
+            const drawCurve = (ctx, intensities, isEnvelope = false) => {
+                ctx.beginPath();
+                if (isEnvelope) {
+                    ctx.setLineDash([6, 6]); 
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.lineWidth = 2;
+                } else {
+                    ctx.strokeStyle = rgbString;
+                    ctx.lineWidth = 2.5;
+                }
+                for (let x = 0; x < width; x++) {
+                    let y = graphBottom - (intensities[x] * graphHeight);
+                    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                if (isEnvelope) ctx.setLineDash([]); // 恢復實線
+            };
+
+            // SINGLE: 畫純繞射曲線
+            drawCurve(ctxSingle, singleIntensities);
+
+            // IDEAL: 畫純干涉曲線
+            drawCurve(ctxIdeal, idealIntensities);
+
+            // REAL: 先畫繞射包絡線 (虛線)，再畫實際強度曲線
+            drawCurve(ctxReal, singleIntensities, true); // 這裡包絡線就是單狹縫的強度
+            drawCurve(ctxReal, realIntensities);
+
+            // X 軸底線繪製函數
+            const drawAxis = (ctx) => {
+                ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.beginPath();
+                ctx.moveTo(0, graphBottom); ctx.lineTo(width, graphBottom); ctx.stroke();
+            };
+            drawAxis(ctxSingle);
+            drawAxis(ctxIdeal);
+            drawAxis(ctxReal);
+
+            // --- 繪製同步對齊線 (黃色虛線) ---
+            const drawGuideLine = (ctx) => {
+                ctx.beginPath();
+                ctx.setLineDash([8, 6]);
+                ctx.strokeStyle = '#FFEB3B'; // 亮黃色
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(guideLineX, 0);
+                ctx.lineTo(guideLineX, height);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 畫個小三角形當作把手標示
+                ctx.fillStyle = '#FFEB3B';
+                ctx.beginPath();
+                ctx.moveTo(guideLineX - 6, 0);
+                ctx.lineTo(guideLineX + 6, 0);
+                ctx.lineTo(guideLineX, 8);
+                ctx.fill();
+            };
+            
+            drawGuideLine(ctxSingle);
+            drawGuideLine(ctxIdeal);
+            drawGuideLine(ctxReal);
+        }
+
+        // --- 拖曳對齊線的事件邏輯 (同步所有 Canvas) ---
+        function getMouseX(canvas, evt) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            let clientX = evt.clientX;
+            if (evt.touches && evt.touches.length > 0) {
+                clientX = evt.touches[0].clientX;
+            }
+            return (clientX - rect.left) * scaleX;
+        }
+
+        const startDrag = (e) => {
+            isDragging = true;
+            updateLine(e);
+        };
+
+        const moveDrag = (e) => {
+            if (!isDragging) return;
+            updateLine(e);
+        };
+
+        const stopDrag = () => {
+            isDragging = false;
+        };
+
+        const updateLine = (e) => {
+            if(e.cancelable) e.preventDefault(); 
+            const canvas = e.target;
+            guideLineX = getMouseX(canvas, e);
+            if (guideLineX < 0) guideLineX = 0;
+            if (guideLineX > width) guideLineX = width;
+            drawAll(); // 重新繪製所有圖像，包含對齊線
+        };
+
+        // 為三個畫布綁定滑鼠與觸控事件
+        [canvasSingle, canvasIdeal, canvasReal].forEach(cvs => {
+            cvs.addEventListener('mousedown', startDrag);
+            cvs.addEventListener('mousemove', moveDrag);
+            cvs.addEventListener('touchstart', startDrag, { passive: false });
+            cvs.addEventListener('touchmove', moveDrag, { passive: false });
+        });
+        
+        // 綁定在 window 上確保正確釋放拖曳狀態
+        window.addEventListener('mouseup', stopDrag);
+        window.addEventListener('touchend', stopDrag);
+
+        // 事件監聽器：參數變更時統一更新
+        Object.values(inputs).forEach(input => {
+            input.addEventListener('input', drawAll);
+        });
+
+        // 初始繪製
+        drawAll(); 
+    </script>
+</body>
+</html>
